@@ -10,14 +10,20 @@ Most single-cell workflows force a choice: Seurat in R or scanpy in Python. Conv
 
 ## Status
 
-v1 — metadata sync implemented and tested. Count matrix sync coming next.
+v1 in progress — preprocessing pipeline through HVG selection implemented and tested.
 
 ### What works
-- `samflow_load()` — loads PBMC-style 10x data into both Seurat and AnnData simultaneously, runs a union merge so both objects start with identical metadata
-- `samflow_sync()` — R → Python directional sync (R is truth)
-- `samflow_sync(from = "python")` — Python → R directional sync (Python is truth)
-- Seurat naming convention enforced (`total_counts` → `nCount_RNA`, `n_genes_by_counts` → `nFeature_RNA`)
-- 43 tests passing (33 R / 10 Python)
+- `samflow_load()` — loads 10x data into both Seurat and AnnData simultaneously with union metadata merge, Seurat naming enforced
+- `samflow_sync()` — R → Python directional metadata sync
+- `samflow_sync(from = "python")` — Python → R directional metadata sync
+- `samflow_normalize()` — log-normalizes both objects with matching scale factor (10k); auto-stashes `layers["counts"]` and `layers["lognorm"]` so raw and log-norm data are never lost
+- `samflow_find_hvg()` — runs `FindVariableFeatures` in R, copies the exact HVG gene set to Python's `var["highly_variable"]`; one selection, both languages use it
+- 59 tests passing (49 R / 10 Python)
+
+### Design principles
+- Operations where **native flexibility matters** (clustering, annotation, plotting) → work in either language, call `samflow_sync()` after
+- Operations where **cross-language consistency is critical** (normalization, HVG selection, scaling) → dedicated `samflow_*()` wrappers run both sides together
+- Data management is invisible — SAMFLOW stashes layers automatically, users never manually copy matrices
 
 ### v1 Constraints
 - RNA assay only (no multi-assay)
@@ -40,7 +46,12 @@ import scanpy as sc
 
 ```r
 source("samflow_functions.R")
+
 samflow_load("filtered_feature_bc_matrix/")
+samflow_normalize()
+samflow_find_hvg(nfeatures = 2000)
+# samflow_scale()   ← coming next
+# samflow_pca()     ← coming next
 
 # Work in R with Seurat
 samflow_obj@meta.data$my_cluster <- Idents(samflow_obj)
@@ -48,7 +59,7 @@ samflow_sync()  # push to Python
 ```
 
 ```python
-# Work in Python with AnnData — same cells, same metadata
+# Work in Python with AnnData — same cells, same metadata, same HVGs
 import scvi
 scvi.model.SCVI.setup_anndata(samflow_obj)
 ```
@@ -66,20 +77,27 @@ pip install scanpy anndata pytest
 
 **Run tests:**
 ```bash
-make test
+make test        # all tests
+make test-unit   # fast Tier 1 only (no data needed)
+make test-log    # save timestamped logs to tests/logs/
 ```
 
 ## Architecture
 
 ```
 samflow_functions.R
-├── samflow_load(path)          # load + union merge
-├── samflow_sync(from="r")      # directional sync
-├── .samflow_obj_r              # internal Seurat storage
-├── samflow_obj                 # active binding (public name)
-├── .samflow_sync_meta_union()  # load-time bidirectional merge
-├── .samflow_sync_meta_r_to_py()
-└── .samflow_sync_meta_py_to_r()
+├── samflow_load(path)            # load both objects + union metadata merge
+├── samflow_normalize(scale=10k)  # log-norm both, stash counts + lognorm layers
+├── samflow_find_hvg(nfeatures)   # R selects HVGs, copies exact set to Python
+├── samflow_sync(from="r")        # directional metadata sync
+├── .samflow_obj_r                # internal Seurat storage
+├── samflow_obj                   # active binding (public-facing name)
+└── SCANPY_TO_SEURAT              # canonical column name mapping
 ```
 
-Seurat column naming is the canonical standard. Known scanpy QC column names are remapped on sync (`SCANPY_TO_SEURAT` mapping).
+## What's next
+
+- `samflow_scale()` — ScaleData equivalent (HVGs only, not synced — regenerated per language)
+- `samflow_pca()` — RunPCA equivalent with cross-language embedding sync
+- Count matrix sync (`@assays$RNA@counts` ↔ `layers["counts"]`)
+- `var` / `meta.features` sync
