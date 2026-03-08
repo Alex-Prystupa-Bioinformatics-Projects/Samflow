@@ -85,6 +85,31 @@ samflow_sync <- function(from = "r") {
   invisible(NULL)
 }
 
+samflow_normalize <- function(scale_factor = 10000) {
+  # R: log-normalize counts, store in @data
+  .samflow_obj_r <<- NormalizeData(
+    .samflow_obj_r,
+    normalization.method = "LogNormalize",
+    scale.factor         = scale_factor
+  )
+
+  # Python: stash raw counts, then normalize + log1p
+  py$samflow_scale_factor <- scale_factor
+  reticulate::py_run_string("
+samflow_obj.layers['counts'] = samflow_obj.X.copy()
+import scanpy as sc
+sc.pp.normalize_total(samflow_obj, target_sum=samflow_scale_factor)
+sc.pp.log1p(samflow_obj)
+samflow_obj.layers['lognorm'] = samflow_obj.X.copy()
+if 'samflow' not in samflow_obj.uns:
+    samflow_obj.uns['samflow'] = {}
+samflow_obj.uns['samflow']['scale_factor'] = samflow_scale_factor
+del samflow_scale_factor
+")
+
+  invisible(NULL)
+}
+
 samflow_load <- function(path) {
   .samflow_obj_r <<- Read10X(path) |> CreateSeuratObject()
 

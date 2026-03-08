@@ -19,6 +19,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 import scanpy as sc
+import scipy.sparse
 ```
 
 # Load Data
@@ -28,52 +29,52 @@ samflow_load("filtered_feature_bc_matrix/")
 ```
 
 # View Data
-## 1. R
+## R
 ```{r}
 head(samflow_obj@meta.data)
 ```
 
-## 1. Python
+## Python
 ```{python}
-samflow_obj.obs
-```
-
-# Verification
-## R Verification
-```{r}
-# Drop columns in R, then sync R → Python
-samflow_obj@meta.data <- samflow_obj@meta.data %>% dplyr::select(orig.ident)
-samflow_sync()
-```
-
-```{r}
-# R should show only orig.ident
-head(samflow_obj@meta.data)
-```
-
-```{python}
-# Python should also show only orig.ident
 samflow_obj.obs.head()
 ```
 
-## Python Verification
-```{python}
-# Add a column in Python, then sync Python → R
-samflow_obj.obs["custom_py_col"] = "hello"
-```
-
-```{python}
-samflow_obj.obs
-```
-
+# Normalize
 ```{r}
-# Trigger Python → R sync
-samflow_sync(from = "python")
-
-# R should now have custom_py_col
-head(samflow_obj@meta.data)
+samflow_normalize()
 ```
 
+## R — log-norm spot check
+```{r}
+# First 5 genes x first 3 cells from @data
+as.matrix(GetAssayData(samflow_obj, layer = "data")[1:5, 1:3])
+```
 
+## Python — log-norm spot check
+```{python}
+# Same values — adata.X is now log-norm (cells x genes, transposed vs R)
+import numpy as np
 
+mat = samflow_obj.X[:3, :5]
+if scipy.sparse.issparse(mat):
+    mat = mat.toarray()
+mat
+```
+
+## Python — raw counts preserved in layers
+```{python}
+# layers["counts"] should still have raw integer counts
+raw = samflow_obj.layers["counts"][:3, :5]
+if scipy.sparse.issparse(raw):
+    raw = raw.toarray()
+raw
+```
+
+## Python — scale factor stored
+```{python}
+samflow_obj.uns["samflow"]
+```
+```{python}
+samflow_obj.var
+```
 
