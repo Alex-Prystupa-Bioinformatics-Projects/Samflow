@@ -1,0 +1,79 @@
+---
+title: "SAMFLOW — R/Python Interop Test"
+format: html
+engine: knitr
+---
+
+# Load Packages
+```{r}
+library(Seurat)
+library(reticulate)
+library(dplyr)
+use_condaenv("samflow", required = TRUE)
+```
+
+```{python}
+import os
+os.environ["KMP_WARNINGS"] = "0"
+import warnings
+warnings.filterwarnings("ignore")
+
+import scanpy as sc
+```
+
+# Load Data
+```{r}
+source("samflow_functions.R")
+samflow_load("filtered_feature_bc_matrix/")
+```
+
+# View Data
+## 1. R
+```{r}
+head(samflow_obj@meta.data)
+```
+
+## 1. Python
+```{python}
+samflow_obj.obs
+```
+
+# Verification
+## R Verification
+```{r}
+# Drop columns in R, then sync R → Python
+samflow_obj@meta.data <- samflow_obj@meta.data %>% dplyr::select(orig.ident)
+samflow_sync()
+```
+
+```{r}
+# R should show only orig.ident
+head(samflow_obj@meta.data)
+```
+
+```{python}
+# Python should also show only orig.ident
+samflow_obj.obs.head()
+```
+
+## Python Verification
+```{python}
+# Add a column in Python, then sync Python → R
+samflow_obj.obs["custom_py_col"] = "hello"
+```
+
+```{python}
+samflow_obj.obs
+```
+
+```{r}
+# Trigger Python → R sync
+samflow_sync(from = "python")
+
+# R should now have custom_py_col
+head(samflow_obj@meta.data)
+```
+
+
+
+

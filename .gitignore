@@ -1,0 +1,18 @@
+# Data files (too large for git)
+filtered_feature_bc_matrix/
+
+# R
+.Rhistory
+.RData
+.Rproj.user/
+
+# Python
+__pycache__/
+.pytest_cache/
+*.pyc
+
+# Test logs
+tests/logs/
+
+# Claude local settings
+.claude/
