@@ -85,6 +85,24 @@ samflow_sync <- function(from = "r") {
   invisible(NULL)
 }
 
+samflow_find_hvg <- function(nfeatures = 2000) {
+  # R: run FindVariableFeatures — result stored in @assays$RNA@var.features
+  .samflow_obj_r <<- FindVariableFeatures(
+    .samflow_obj_r,
+    selection.method = "vst",
+    nfeatures        = nfeatures
+  )
+
+  # Push R's HVG list to Python as the authoritative set
+  py$samflow_hvg <- VariableFeatures(.samflow_obj_r)
+  reticulate::py_run_string("
+samflow_obj.var['highly_variable'] = samflow_obj.var_names.isin(samflow_hvg)
+del samflow_hvg
+")
+
+  invisible(NULL)
+}
+
 samflow_normalize <- function(scale_factor = 10000) {
   # R: log-normalize counts, store in @data
   .samflow_obj_r <<- NormalizeData(

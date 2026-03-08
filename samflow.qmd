@@ -75,6 +75,26 @@ raw
 samflow_obj.uns["samflow"]
 ```
 ```{python}
-samflow_obj.var
+samflow_obj.layers['lognorm']
+```
+
+# Find HVGs
+```{r}
+samflow_find_hvg(nfeatures = 2000)
+```
+
+## R — top variable features
+```{r}
+head(VariableFeatures(samflow_obj), 20)
+```
+
+## Python — highly_variable flag
+```{python}
+samflow_obj.var["highly_variable"].value_counts()
+```
+
+## Python — HVG gene names
+```{python}
+samflow_obj.var_names[samflow_obj.var["highly_variable"]].tolist()[:20]
 ```
 
